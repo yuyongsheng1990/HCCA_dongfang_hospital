@@ -1,0 +1,10 @@
+*.csv
+.idea
+data
+jpg
+result
+*.h5
+*.json
+*.tsv
+*.dill
+learn
