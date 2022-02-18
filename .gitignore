@@ -8,3 +8,4 @@ result
 *.tsv
 *.dill
 learn
+.ipynb_checkpoints
