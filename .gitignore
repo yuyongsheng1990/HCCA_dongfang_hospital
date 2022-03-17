@@ -9,3 +9,6 @@ result
 *.dill
 learn
 .ipynb_checkpoints
+.Rproj.user
+.RData
+.Rhistory
