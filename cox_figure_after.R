@@ -310,7 +310,7 @@ compare_Cindex  <- pec::cindex(list("Risk Score System"=fit_score,"Former Risk S
                                splitMethod="BootCv",B=3,confInt = TRUE,eval.times=seq(1,80,1)) # BootCv集成方式会导致结果随机，可能报错，也可能不报错,要不就用"noPlan"
 print(compare_Cindex)
 op<-par(mfrow=c(1,1))
-plot(compare_Cindex,legend.cex=1,ylim = c(0.5,1),xlim = c(0,80),xlab = "Time(month)")
+plot(compare_Cindex,legend.cex=0.8,ylim = c(0.5,1),xlim = c(0,80),xlab = "Time(month)")
 x # 通过数据查看最好的随机数种子是多少
 
 ## compare 术前分期BS
