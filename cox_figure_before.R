@@ -24,6 +24,7 @@ library(MASS)
 df_before_ML_tran <- read.xlsx("D:/PycharmProjects/HCCA_dongfang_hospital/data/result/cox/df_1.7.2.5_before_ML_tran_cox.xlsx", 1, encoding = "UTF-8")
 df_before_ML_tran <- df_before_ML_tran[,-1]
 names(df_before_ML_tran)
+dim(df_before_ML_tran)
 df_before_ML_test <- read.xlsx("D:/PycharmProjects/HCCA_dongfang_hospital/data/result/cox/df_1.7.2.5_before_ML_test_cox.xlsx", 1, encoding = "UTF-8")
 df_before_ML_test <- df_before_ML_test[,-1]
 names(df_before_ML_test)
@@ -37,19 +38,19 @@ dim(df_before_ML_test) # 数据维度
 df_before_ML_test <-df_before_ML_test[!(is.na(df_before_ML_test$target_survival_month)),]
 dim(df_before_ML_test)
 ## 机器学习提取的cox回归
-b.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~Gazzaniga_T+tumor_CA19.9+gene_mutation+jaundice+biliary_disease+smoke+tumor_AFP+HBsAg+drinking+Bismuth_C+tumor_CEA+emaciation+nbdd+endocrine_disease,
+b.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~tumor_CA19.9+Gazzaniga_T+Blumgart_T+MSKCC+jaundice+drinking+biliary_disease+emaciation+tumor_CEA+HBsAg+DB+tumor_AFP+Bismuth_C+cardio_disease,
                data=df_before_ML_tran, x=TRUE,y=T) 
 summary(b.cox)
 ## backward stepwise筛选机器ML变量
 AICBWCOX.obj <- stepAIC(b.cox,direction= c("backward"), steps = 1000)
 summary(AICBWCOX.obj)
 # cox回归：ml+backward stepwise
-b.d.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~ Gazzaniga_T+tumor_CA19.9+tumor_CEA+nbdd+endocrine_disease, data=df_before_ML_tran, x=TRUE) 
+b.d.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~ tumor_CA19.9+MSKCC+biliary_disease+tumor_CEA+DB, data=df_before_ML_tran, x=TRUE) 
 summary(b.d.cox)
 # 95%CI：c_index +/-1.96*se
-CI.min <- 0.709-1.96*0.024
+CI.min <- 0.746-1.96*0.022
 CI.min
-CI.max <- 0.709+1.96*0.024
+CI.max <- 0.746+1.96*0.022
 CI.max
 
 # -------------------------------------模型筛选能力对比筛选-----------------------------------------------
@@ -76,24 +77,27 @@ all.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~ ., data=df_befor
 AICBWCOX.obj <- stepAIC(all.cox,direction= c("backward"), steps = 1000)
 summary(AICBWCOX.obj)
 # cox回归：全部变量+backward stepwise
-all.d.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~ biliary_disease+smoke+tumor_CEA+tumor_CA19.9, data=df_before_all_tran, x=TRUE) 
+all.d.cox <- coxph(Surv(target_survival_month, target_3Y_death) ~ DB+tumor_CEA+tumor_CA19.9+Blumgart_T, data=df_before_all_tran, x=TRUE) 
 summary(all.d.cox)
 
 # 比较模型c_index
 surv.f <- as.formula(Surv(target_survival_month, target_3Y_death) ~ .)
 pec.f <- as.formula(Surv(target_survival_month, target_3Y_death) ~ 1)
 ## compare C-index
-set.seed(142)
-bcvCindex  <- pec::cindex(list("Machine Learning"=b.cox,"Backward Stepwise"=all.d.cox,"Machine Learning and Backward Stepwise"=b.d.cox),
+set.seed(3)
+bcvCindex  <- pec::cindex(list("Machine Learning"=b.cox,"All Variables and Backward Stepwise"=all.d.cox,"Machine Learning and Backward Stepwise"=b.d.cox),
                           formula=pec.f, newdata=df_before_all_test,
                           splitMethod="BootCv",B=3,confInt = TRUE,eval.times=seq(1,88,1))
 print(bcvCindex)
 op<-par(mfrow=c(1,1))
-plot(bcvCindex,Legend.cex=1, ylim = c(0.6,0.9),xlim=range(0,80),xlab = "Time(month)")
+plot(bcvCindex,Legend.cex=1, ylim = c(0.6,1),xlim=range(0,80),xlab = "Time(month)", legend.title=element_blank())  # element_blank()移除所有表题
+legend("topright", inset = 0.05, c("Machine Learning","All Variables and Backward Stepwise","Machine Learning and Backward Stepwise"),
+        lty = c(1), col = c('black','red','green'), box.lty=0) # 添加线条标签; legend去除外边框线box.lty=0
+# mtext("Chick1-diet1", side = 2,line = -6,las = 1, col = "red") # 添加线条标注
 x # 获得随机数种子22
 
 ## compare Brier score
-set.seed(22)
+set.seed(3)
 bcvBS <- pec(list("Machine Learning"=b.cox,"Backward Stepwise"=all.d.cox,"Machine Learning and Backward Stepwise"=b.d.cox), 
                           newdata = df_before_all_test, formula = pec.f, cens.model = "marginal", 
                           splitMethod = "BootCv",B=3, confInt = TRUE, confLevel = 0.95, reference = F)
@@ -118,19 +122,22 @@ df_before_staging_test <- read.xlsx("D:/PycharmProjects/HCCA_dongfang_hospital/d
 df_before_staging_test <- df_before_staging_test[,-1]
 names(df_before_staging_test)
 
-
 w=c(df_before_staging_test$risk_score_3Y)
 hist(w,breaks=20,freq=T,col = "gray",main=paste("The Median of Risk Socre：",round(median(df_before_staging_test$risk_score_3Y),1)),xlab = "The Risk Scores of Test Set",xlim=range(0,3))
 x=seq(min(w),max(w),by=0.001)#做一组序列，用于绘制normal curve的x坐标
 y=dnorm(x,mean(w),sd(w))#求x的正态分布函数值
 lines(x,y*20,col="blue",lwd=2)#添加一条正态曲线
 
-#-------------------------------------术前分期生存分析曲线图-------------------------------------------------
-
-# 删除训练集空值
+#-------------------------------------术前分期生存分析曲线图(with 置信区间)-------------------------------------------------
+# 删除训练集生存时长空值
 dim(df_before_staging_tran) # 数据维度
-df_before_staging_tran <-df_before_staging_tran[!(is.na(df_before_staging_tran$target_survival_month)|is.na(df_before_staging_tran$MSKCC)),]
+df_before_staging_tran <-df_before_staging_tran[!(is.na(df_before_staging_tran$target_survival_month)),]
 dim(df_before_staging_tran)
+
+# 删除测试集生存时长空值
+dim(df_before_staging_test) # 数据维度
+df_before_staging_test <-df_before_staging_test[!(is.na(df_before_staging_test$target_survival_month)),]
+dim(df_before_staging_test)
 
 # 画出术前训练集生存曲线
 fit_us <- survfit(Surv(target_survival_month, target_3Y_death)~ staging_before_3Y, data = df_before_staging_tran)
@@ -153,11 +160,6 @@ ggsurvplot(fit_us, data = df_before_staging_tran,
            break.x.by=20, # 设置x轴刻度间距
            xlim=c(0,80)) # 设置x轴刻度区间
 
-# 删除测试集空值
-dim(df_before_staging_test) # 数据维度
-df_before_staging_test <-df_before_staging_test[!(is.na(df_before_staging_test$target_survival_month)|is.na(df_before_staging_test$MSKCC)),]
-dim(df_before_staging_test)
-
 # 画出术前测试集生存曲线
 fit_us <- survfit(Surv(target_survival_month, target_3Y_death)~ staging_before_3Y, data = df_before_staging_test)
 class(fit_us)
@@ -179,10 +181,10 @@ ggsurvplot(fit_us, data = df_before_staging_test,
            break.x.by=20, # 设置x轴刻度间距
            xlim=c(0,80)) # 设置x轴刻度区间
 
-# ---------------------------------术前分期比较----------------------------------------------------
+# ---------------------------------术前分期生存曲线----------------------------------------------------
 
 ## compare 术前分期C-index
-set.seed(142)
+set.seed(3)
 
 # 术前分期生存曲线
 fit_score <- survfit(Surv(target_survival_month, target_3Y_death)~ staging_before_3Y, data = df_before_staging_tran)
@@ -203,7 +205,7 @@ ggsurvplot(fit_score, data = df_before_staging_tran,
            legend.labs = c("1","2","3","4","5"),
            break.x.by=20, # 设置x轴刻度间距
            xlim=c(0,80)) # 设置x轴刻度区间
-
+'''
 # 现有方法分期
 fit_existing <- survfit(Surv(target_survival_month, target_3Y_death)~ staging_before_existing, data = df_before_staging_tran)
 class(fit_existing)
@@ -223,6 +225,7 @@ ggsurvplot(fit_existing, data = df_before_staging_tran,
            legend.labs = c("1","2","3","4"),
            break.x.by=20, # 设置x轴刻度间距
            xlim=c(0,80)) # 设置x轴刻度区间
+'''
 
 # Gazzaniga_T分期
 fit_gazz <- survfit(Surv(target_survival_month, target_3Y_death)~ Gazzaniga_T, data = df_before_staging_tran)
@@ -273,24 +276,35 @@ ggsurvplot(fit_blumgart, data = df_before_staging_tran,
            break.x.by=20, # 设置x轴刻度间距
            xlim=c(0,80)) # 设置x轴刻度区间
 
+#------------------------------比较术前分期c_index和BS----------------------------------------
+# 删除训练集空值
+dim(df_before_staging_tran) # 数据维度
+df_before_staging_tran <-df_before_staging_tran[!(is.na(df_before_staging_tran$Gazzaniga_T)),]
+dim(df_before_staging_tran)
+
+# 删除测试集空值
+dim(df_before_staging_test) # 数据维度
+df_before_staging_test <-df_before_staging_test[!(is.na(df_before_staging_test$Gazzaniga_T)),]
+dim(df_before_staging_test)
+
 ##画出多个评分系统的c_index和BS比较图
 pec.f <- as.formula(Surv(target_survival_month, target_3Y_death) ~ 1)
-set.seed(4)
-compare_Cindex  <- pec::cindex(list("Risk Score System"=fit_score,"Former Risk Score System"=fit_existing,"Gazzaniga_T"=fit_gazz,"MSKCC"=fit_mskcc,"Blumgart_T"=fit_blumgart),
+set.seed(3)
+compare_Cindex  <- pec::cindex(list("Risk Score System"=fit_score,"Gazzaniga_T"=fit_gazz,"MSKCC"=fit_mskcc,"Blumgart_T"=fit_blumgart),
                           formula=pec.f, newdata=df_before_staging_test,
                           splitMethod="BootCv",B=3,confInt = TRUE,eval.times=seq(1,88,1)) # BootCv集成方式会导致结果随机，可能报错，也可能不报错,要不就用"noPlan"
 print(compare_Cindex)
 op<-par(mfrow=c(1,1))
 plot(compare_Cindex,legend.cex=1,ylim = c(0.5,0.9),xlim = c(0,80),xlab = "Time(month)")
-x # 查看随机数种子
+# 查看随机数种子 x
 
 ## compare 术前分期BS
-set.seed(4)
-compare_bs <- pec(list("Risk Score System"=fit_score,"Former Risk Score System"=fit_existing,"Gazzaniga_T"=fit_gazz,"MSKCC"=fit_mskcc,"Blumgart_T"=fit_blumgart),
+set.seed(3)
+compare_bs <- pec(list("Risk Score System"=fit_score,"Gazzaniga_T"=fit_gazz,"MSKCC"=fit_mskcc,"Blumgart_T"=fit_blumgart),
                   newdata = df_before_staging_test, formula = pec.f, cens.model = "marginal", 
                   splitMethod = "BootCv",B=3, confInt = TRUE, confLevel = 0.95, reference = F) # BootCv集成方式会导致结果随机，可能报错，也可能不报错,要不就用"noPlan"
 print(compare_bs)
 plot(compare_bs,legend.cex=0.8,xlim = c(0,80), xlab = "Time(month)", ylab = "Barier Score")
-x
+
 
 
